@@ -3,7 +3,6 @@ import boto3
 import subprocess
 import os
 import errno
-import yaml
 from datetime import datetime
 
 
