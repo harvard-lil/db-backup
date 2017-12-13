@@ -99,14 +99,14 @@ except OSError as e:
 print("Dumping database...")
 if engine == 'mysql':
     mycnf = os.path.join(os.getcwd(), '.{0}.my.cnf'.format(args.instance))
-    with open(os.path.join(args.instance, '{0}.sql'.format(db_instance)), 'w') as f:
+    with open(os.path.join(os.getcwd(),
+                           args.instance,
+                           '{0}.sql'.format(db_instance)), 'w') as f:
         print("Using {0}".format(mycnf))
         returncode = subprocess.call(['mysqldump',
-                                      '--defaults-extra-file={0}'.format(mycnf),
+                                      '--defaults-extra-file={0}'.format(
+                                          mycnf),
                                       '--single-transaction',
-                                      # either 
-                                      #'--all-databases',
-                                      # or
                                       '--databases',
                                       args.database,
                                       '-h',
@@ -134,7 +134,10 @@ elif engine == 'postgres':
                                   user,
                                   '-w',
                                   '-f',
-                                  os.path.join(args.instance, '{0}.dump'.format(db_instance))],
+                                  os.path.join(os.getcwd(),
+                                               args.instance,
+                                               '{0}.dump'.format(
+                                                   db_instance))],
                                  env=d)
 
 print("Deleting instance {0}".format(db_instance))
