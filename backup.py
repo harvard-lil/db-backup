@@ -12,7 +12,16 @@ from datetime import datetime
 automated snapshot, creating a new database instance from it, and
 dumping the results with mysqldump or pg_dump as necessary.
 
-It requires that your AWS credentials be in place.
+It requires that your AWS credentials be in place, and your allowed actions
+should include:
+
+    "rds:DescribeDBSnapshots",
+    "rds:CreateDBSnapshots",
+    "rds:DeleteDBSnapshots",
+    "rds:RestoreDBInstanceFromDBSnapshot",
+    "rds:DescribeDBInstances",
+    "rds:ModifyDBInstance",
+    "rds:DeleteDBInstance"
 
 It requires that your database credentials be in place:
 
@@ -32,13 +41,7 @@ have permissions of 0600, and read:
 where dbinstance matches that supplied on the command line.
 
 It requires a security group that allows your IP address or range to
-reach the appropriate port. Should this script create the necessary
-security group? It would then require greater privileges.
-
-We need a set of tuples of (source, vpc) to determine security group;
-it might be better to require the user to supply the SG.
-
-TODO: add option for making a fresh snapshot and using that?
+reach the appropriate port.
 
 """
 
@@ -47,6 +50,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("instance")
 parser.add_argument("database")
 parser.add_argument("securitygroup")
+parser.add_argument("--snapshot",
+                    help="take a snapshot; ONLY USE WITH MULTI-AZ INSTANCES!",
+                    action="store_true")
 parser.add_argument("--verbose", help="info-level output",
                     action="store_true")
 parser.add_argument("--debug", help="debug-level output",
@@ -61,20 +67,34 @@ if args.debug:
 logging.info("Connecting to RDS...")
 client = boto3.client('rds')
 
-logging.info("Identifying snapshots...")
-response = client.describe_db_snapshots(
-    DBInstanceIdentifier=args.instance,
-    SnapshotType='automated')
+backup_time = datetime.now()
+backup_timestamp = backup_time.strftime('%Y%m%d%H%M%S')
 
-latest = max([s['DBSnapshotIdentifier'] for s in response['DBSnapshots']])
-logging.info("Latest is {0}".format(latest))
+if args.snapshot:
+    snapshot_identifier = "dbb-{0}-{1}".format(args.instance, backup_timestamp)
+    logging.info("Creating snapshot {0}...".format(snapshot_identifier))
+    response = client.create_db_snapshot(
+        DBSnapshotIdentifier=snapshot_identifier,
+        DBInstanceIdentifier=args.instance)
+    latest = snapshot_identifier
+    snaptime = backup_time
+    waiter = client.get_waiter('db_snapshot_completed')
+    waiter.wait(DBSnapshotIdentifier=snapshot_identifier)
+    logging.info("Snapshot created.")
+else:
+    logging.info("Identifying snapshots...")
+    response = client.describe_db_snapshots(
+        DBInstanceIdentifier=args.instance,
+        SnapshotType='automated')
 
-snaptime = datetime.strptime(latest,
-                             "rds:{0}-%Y-%m-%d-%H-%M".format(args.instance))
+    latest = max([s['DBSnapshotIdentifier'] for s in response['DBSnapshots']])
+    logging.info("Latest is {0}".format(latest))
+    snaptime = datetime.strptime(
+        latest, "rds:{0}-%Y-%m-%d-%H-%M".format(args.instance))
 
 db_instance = "{0}-{1}-fromsnap-{2}".format(
     args.instance,
-    datetime.now().strftime('%Y%m%d%H%M%S'),
+    backup_timestamp,
     snaptime.strftime('%Y%m%d%H%M%S'))
 
 logging.info("Restoring snapshot to instance {0}".format(db_instance))
@@ -170,5 +190,12 @@ response5 = client.delete_db_instance(
     DBInstanceIdentifier=db_instance,
     SkipFinalSnapshot=True
 )
+
+# is this necessary? the creation of the new instance also
+# produces another snapshot we might want to delete
+if args.snapshot:
+    logging.info("Deleting snapshot...")
+    response6 = client.delete_db_snapshot(
+        DBSnapshotIdentifier=snapshot_identifier)
 
 logging.info("Done.")
