@@ -101,9 +101,9 @@ if engine == 'mysql':
     mycnf = os.path.join(os.getcwd(), '.{0}.my.cnf'.format(args.instance))
     with open(os.path.join(os.getcwd(),
                            args.instance,
-                           '{0}.sql'.format(db_instance)), 'w') as f:
+                           '{0}.sql.xz'.format(db_instance)), 'w') as f:
         print("Using {0}".format(mycnf))
-        returncode = subprocess.call(['mysqldump',
+        mysqldump = subprocess.Popen(['mysqldump',
                                       '--defaults-extra-file={0}'.format(
                                           mycnf),
                                       '--single-transaction',
@@ -114,7 +114,12 @@ if engine == 'mysql':
                                       '-u',
                                       user,
                                       '-P',
-                                      str(port)], stdout=f)
+                                      str(port)], stdout=subprocess.PIPE)
+        compress = subprocess.call(['xz',
+                                    '--stdout',
+                                    '-'],
+                                   stdin=mysqldump.stdout, stdout=f)
+        mysqldump.wait()
 elif engine == 'postgres':
     # .pgpass in this directory must be set to 0600
     # the host entry for each possibility must be *
