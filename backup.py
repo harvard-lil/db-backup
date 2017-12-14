@@ -3,6 +3,7 @@ import boto3
 import subprocess
 import os
 import errno
+import stat
 from datetime import datetime
 
 
@@ -47,16 +48,16 @@ parser.add_argument("database")
 parser.add_argument("securitygroup")
 args = parser.parse_args()
 
-print("Connecting to RDS...")
+# print("Connecting to RDS...")
 client = boto3.client('rds')
 
-print("Identifying snapshots...")
+# print("Identifying snapshots...")
 response = client.describe_db_snapshots(
     DBInstanceIdentifier=args.instance,
     SnapshotType='automated')
 
 latest = max([s['DBSnapshotIdentifier'] for s in response['DBSnapshots']])
-print("Latest is {0}".format(latest))
+# print("Latest is {0}".format(latest))
 
 snaptime = datetime.strptime(latest,
                              "rds:{0}-%Y-%m-%d-%H-%M".format(args.instance))
@@ -66,17 +67,17 @@ db_instance = "{0}-{1}-fromsnap-{2}".format(
     datetime.now().strftime('%Y%m%d%H%M%S'),
     snaptime.strftime('%Y%m%d%H%M%S'))
 
-print("Restoring snapshot to instance {0}".format(db_instance))
+# print("Restoring snapshot to instance {0}".format(db_instance))
 response2 = client.restore_db_instance_from_db_snapshot(
     DBInstanceIdentifier=db_instance,
     DBSnapshotIdentifier=latest)
 
 # wait for db to become available
-print("Waiting for instance to become available...")
+# print("Waiting for instance to become available...")
 waiter = client.get_waiter('db_instance_available')
 waiter.wait(DBInstanceIdentifier=db_instance)
 
-print("Getting instance information...")
+# print("Getting instance information...")
 response3 = client.describe_db_instances(DBInstanceIdentifier=db_instance)
 
 engine = response3['DBInstances'][0]['Engine']
@@ -84,25 +85,31 @@ host = response3['DBInstances'][0]['Endpoint']['Address']
 port = response3['DBInstances'][0]['Endpoint']['Port']
 user = response3['DBInstances'][0]['MasterUsername']
 
-print("Modifying instance with security group {0}".format(args.securitygroup))
+# print("Modifying instance with security group {0}".format(args.securitygroup))
 response4 = client.modify_db_instance(
     DBInstanceIdentifier=db_instance,
     VpcSecurityGroupIds=[args.securitygroup])
 
 try:
     os.makedirs(os.path.join(os.getcwd(), args.instance))
-    print("Created directory {0}".format(args.instance))
+    # print("Created directory {0}".format(args.instance))
 except OSError as e:
     if e.errno != errno.EEXIST:
         raise
 
-print("Dumping database...")
+# print("Dumping database...")
 if engine == 'mysql':
     mycnf = os.path.join(os.getcwd(), '.{0}.my.cnf'.format(args.instance))
-    with open(os.path.join(os.getcwd(),
-                           args.instance,
-                           '{0}.sql.xz'.format(db_instance)), 'w') as f:
-        print("Using {0}".format(mycnf))
+    # https://stackoverflow.com/a/15015748/4074877
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    mode = stat.S_IRUSR | stat.S_IWUSR
+    with os.fdopen(os.open(os.path.join(os.getcwd(),
+                                   args.instance,
+                                   '{0}.sql.xz'.format(db_instance)),
+                           flags,
+                           mode),
+                   'w') as f:
+        # print("Using {0}".format(mycnf))
         mysqldump = subprocess.Popen(['mysqldump',
                                       '--defaults-extra-file={0}'.format(
                                           mycnf),
@@ -125,7 +132,7 @@ elif engine == 'postgres':
     # the host entry for each possibility must be *
     # (psycopg2 does not have pg_dump functionality)
     pgpass = os.path.join(os.getcwd(), '.{0}.pgpass'.format(args.instance))
-    print("Using {0}".format(pgpass))
+    # print("Using {0}".format(pgpass))
     d = dict(os.environ)
     d['PGPASSFILE'] = pgpass
     returncode = subprocess.call(['pg_dump',
@@ -145,10 +152,10 @@ elif engine == 'postgres':
                                                    db_instance))],
                                  env=d)
 
-print("Deleting instance {0}".format(db_instance))
+# print("Deleting instance {0}".format(db_instance))
 response5 = client.delete_db_instance(
     DBInstanceIdentifier=db_instance,
     SkipFinalSnapshot=True
 )
 
-print("Done.")
+# print("Done.")
