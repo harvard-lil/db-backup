@@ -50,6 +50,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("instance")
 parser.add_argument("database")
 parser.add_argument("securitygroup")
+parser.add_argument("billableto",
+                    help="Value of 'Billable To' tag for accounting")
 parser.add_argument("--snapshot",
                     help="take a snapshot; ONLY USE WITH MULTI-AZ INSTANCES!",
                     action="store_true")
@@ -75,7 +77,13 @@ if args.snapshot:
     logging.info("Creating snapshot {0}...".format(snapshot_identifier))
     response = client.create_db_snapshot(
         DBSnapshotIdentifier=snapshot_identifier,
-        DBInstanceIdentifier=args.instance)
+        DBInstanceIdentifier=args.instance,
+        Tags=[
+            {
+                'Key': 'Billable To',
+                'Value': args.billableto
+            }
+        ])
     latest = snapshot_identifier
     snaptime = backup_time
     waiter = client.get_waiter('db_snapshot_completed')
@@ -100,7 +108,14 @@ db_instance = "{0}-{1}-fromsnap-{2}".format(
 logging.info("Restoring snapshot to instance {0}".format(db_instance))
 response2 = client.restore_db_instance_from_db_snapshot(
     DBInstanceIdentifier=db_instance,
-    DBSnapshotIdentifier=latest)
+    DBSnapshotIdentifier=latest,
+    Tags=[
+        {
+            'Key': 'Billable To',
+            'Value': args.billableto
+        }
+    ],
+    CopyTagsToSnapshot=True)
 
 # wait for db to become available
 logging.info("Waiting for instance to become available...")
