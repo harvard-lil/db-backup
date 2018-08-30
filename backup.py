@@ -95,7 +95,8 @@ else:
         DBInstanceIdentifier=args.instance,
         SnapshotType='automated')
 
-    latest = max([s['DBSnapshotIdentifier'] for s in response['DBSnapshots']])
+    latest = max([s['DBSnapshotIdentifier'] for s in response['DBSnapshots']
+                  if s['DBSnapshotIdentifier'].startswith("rds:{0}".format(args.instance))])
     logging.info("Latest is {0}".format(latest))
     snaptime = datetime.strptime(
         latest, "rds:{0}-%Y-%m-%d-%H-%M".format(args.instance))
