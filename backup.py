@@ -52,6 +52,7 @@ parser.add_argument("database")
 parser.add_argument("securitygroup")
 parser.add_argument("billableto",
                     help="Value of 'Billable To' tag for accounting")
+parser.add_argument("--profile", default="default")
 parser.add_argument("--snapshot",
                     help="take a snapshot; ONLY USE WITH MULTI-AZ INSTANCES!",
                     action="store_true")
@@ -67,7 +68,7 @@ if args.debug:
     logging.basicConfig(level=logging.info)
 
 logging.info("Connecting to RDS...")
-client = boto3.client('rds')
+client = boto3.client('rds', profile_name=args.profile)
 
 backup_time = datetime.now()
 backup_timestamp = backup_time.strftime('%Y%m%d%H%M%S')
