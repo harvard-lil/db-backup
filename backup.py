@@ -68,7 +68,8 @@ if args.debug:
     logging.basicConfig(level=logging.info)
 
 logging.info("Connecting to RDS...")
-client = boto3.client('rds', profile_name=args.profile)
+session = boto3.Session(profile_name=args.profile)
+client = session.client('rds')
 
 backup_time = datetime.now()
 backup_timestamp = backup_time.strftime('%Y%m%d%H%M%S')
