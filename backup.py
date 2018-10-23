@@ -5,6 +5,7 @@ import os
 import errno
 import stat
 import logging
+import psycopg2
 from datetime import datetime
 
 
@@ -60,12 +61,14 @@ parser.add_argument("--verbose", help="info-level output",
                     action="store_true")
 parser.add_argument("--debug", help="debug-level output",
                     action="store_true")
+parser.add_argument("--fixperms", help="handle permissions problem for the CAPI API",
+                    action="store_true")
 args = parser.parse_args()
 
 if args.verbose:
     logging.basicConfig(level=logging.INFO)
 if args.debug:
-    logging.basicConfig(level=logging.info)
+    logging.basicConfig(level=logging.DEBUG)
 
 logging.info("Connecting to RDS...")
 session = boto3.Session(profile_name=args.profile)
@@ -187,6 +190,19 @@ elif engine == 'postgres':
                             '{0}.dump'.format(db_instance))
     fd = os.open(dumpfile, flags, mode)
     os.close(fd)
+    # in some cases (capstone) the master user does not have permissions for
+    # the schema; in this case, we need to connect to the database and issue
+    # the right permissions
+    if args.fixperms:
+        conn = psycopg2.connect("host={0}".format(host))
+        cur = conn.cursor()
+        cur.execute("GRANT ALL ON SCHEMA capstone TO GROUP rds_superuser;")
+        cur.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA capstone TO GROUP rds_superuser;")
+        cur.execute("GRANT USAGE ON SCHEMA capstone TO GROUP rds_superuser;")
+        conn.commit()
+        cur.close()
+        conn.close()
+    # then we run pg_dump
     d = dict(os.environ)
     d['PGPASSFILE'] = pgpass
     returncode = subprocess.call(['pg_dump',
