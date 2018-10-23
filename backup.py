@@ -199,6 +199,7 @@ elif engine == 'postgres':
         cur.execute("GRANT ALL ON SCHEMA capstone TO GROUP rds_superuser;")
         cur.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA capstone TO GROUP rds_superuser;")
         cur.execute("GRANT USAGE ON SCHEMA capstone TO GROUP rds_superuser;")
+        cur.execute("GRANT SELECT ON ALL SEQUENCES IN SCHEMA capstone TO GROUP rds_superuser;")
         conn.commit()
         cur.close()
         conn.close()
