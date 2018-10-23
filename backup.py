@@ -194,7 +194,7 @@ elif engine == 'postgres':
     # the schema; in this case, we need to connect to the database and issue
     # the right permissions
     if args.fixperms:
-        conn = psycopg2.connect("host={0}".format(host))
+        conn = psycopg2.connect("passfile=/srv/backup/db/.pgpass host={0}".format(host))
         cur = conn.cursor()
         cur.execute("GRANT ALL ON SCHEMA capstone TO GROUP rds_superuser;")
         cur.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA capstone TO GROUP rds_superuser;")
