@@ -17,8 +17,8 @@ It requires that your AWS credentials be in place, and your allowed actions
 should include:
 
     "rds:DescribeDBSnapshots",
-    "rds:CreateDBSnapshots",
-    "rds:DeleteDBSnapshots",
+    "rds:CreateDBSnapshot",
+    "rds:DeleteDBSnapshot",
     "rds:RestoreDBInstanceFromDBSnapshot",
     "rds:DescribeDBInstances",
     "rds:ModifyDBInstance",
